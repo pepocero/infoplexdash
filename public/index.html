@@ -257,6 +257,28 @@
       height: 320px;
     }
 
+    .chart-container--tall {
+      height: 420px;
+    }
+
+    .chart-empty {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .chart-empty code {
+      background: var(--border);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8em;
+    }
+
+    .hidden {
+      display: none;
+    }
+
     .state {
       text-align: center;
       padding: 4rem 2rem;
@@ -358,85 +380,81 @@
       `;
     }
 
-    function renderChart(data) {
-      if (!data || data.length === 0) return '';
-
-      const labels = data.map(r => formatDate(r.timestamp)).reverse();
-      const moviesData = data.map(r => r.movies).reverse();
-      const showsData = data.map(r => r.shows).reverse();
-      const episodesData = data.map(r => r.episodes).reverse();
-
-      const html = `
-        <div class="chart-wrap">
-          <h2>Evolución en el tiempo</h2>
-          <div class="chart-container">
-            <canvas id="evolutionChart" aria-label="Gráfica de evolución de películas, series y episodios"></canvas>
+    function renderCategoriesChartSection() {
+      return `
+        <div class="chart-wrap" id="categoriesChartWrap">
+          <h2>Películas por categoría</h2>
+          <div class="chart-container chart-container--tall">
+            <canvas id="categoriesChart" aria-label="Gráfica de películas por categoría (Acción, Terror, etc.)"></canvas>
           </div>
+          <div class="chart-empty hidden" id="categoriesChartEmpty">No hay datos en <code>plex_library_stats</code>.</div>
         </div>
       `;
+    }
 
-      setTimeout(() => {
-        const ctx = document.getElementById('evolutionChart');
-        if (!ctx) return;
-        new Chart(ctx.getContext('2d'), {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              {
+    function loadMovieCategoriesChart() {
+      const wrap = document.getElementById('categoriesChartWrap');
+      const canvas = document.getElementById('categoriesChart');
+      const emptyEl = document.getElementById('categoriesChartEmpty');
+      if (!wrap || !canvas) return;
+
+      fetchWithTimeout('/api/library-stats')
+        .then(function (res) { return res.json(); })
+        .then(function (json) {
+          var data = json.data || [];
+          if (data.length === 0) {
+            if (emptyEl) { emptyEl.classList.remove('hidden'); }
+            return;
+          }
+          data.sort(function (a, b) { return (Number(b.count) || 0) - (Number(a.count) || 0); });
+          if (emptyEl) { emptyEl.classList.add('hidden'); }
+          var labels = data.map(function (r) { return r.library_name || '—'; });
+          var counts = data.map(function (r) { return Number(r.count) || 0; });
+          var colors = ['#a78bfa', '#34d399', '#f472b6', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316', '#6366f1'];
+          var bgColors = data.map(function (_, i) { return colors[i % colors.length]; });
+          new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{
                 label: 'Películas',
-                data: moviesData,
-                borderColor: '#a78bfa',
-                backgroundColor: 'rgba(167, 139, 250, 0.1)',
-                fill: true,
-                tension: 0.3
+                data: counts,
+                backgroundColor: bgColors,
+                borderColor: bgColors.map(function (c) { return c; }),
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              indexAxis: 'y',
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: function (ctx) { return ctx.raw + ' películas'; }
+                  }
+                }
               },
-              {
-                label: 'Series',
-                data: showsData,
-                borderColor: '#34d399',
-                backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                fill: true,
-                tension: 0.3
-              },
-              {
-                label: 'Episodios',
-                data: episodesData,
-                borderColor: '#f472b6',
-                backgroundColor: 'rgba(244, 114, 182, 0.1)',
-                fill: true,
-                tension: 0.3
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: {
-                position: 'top',
-                labels: {
-                  color: '#e4e4e7',
-                  font: { family: 'Outfit', size: 12 }
+              scales: {
+                x: {
+                  grid: { color: 'rgba(42, 42, 48, 0.6)' },
+                  ticks: { color: '#71717a' }
+                },
+                y: {
+                  grid: { color: 'rgba(42, 42, 48, 0.6)' },
+                  ticks: { color: '#e4e4e7', font: { size: 12 } }
                 }
               }
-            },
-            scales: {
-              x: {
-                grid: { color: 'rgba(42, 42, 48, 0.6)' },
-                ticks: { color: '#71717a', maxTicksLimit: 10 }
-              },
-              y: {
-                grid: { color: 'rgba(42, 42, 48, 0.6)' },
-                ticks: { color: '#71717a' }
-              }
             }
+          });
+        })
+        .catch(function () {
+          if (emptyEl) {
+            emptyEl.textContent = 'No se pudieron cargar los datos de bibliotecas.';
+            emptyEl.classList.remove('hidden');
           }
         });
-      }, 50);
-
-      return html;
     }
 
     async function load() {
@@ -462,8 +480,9 @@
         const latest = data[0];
         lastUpdate.textContent = 'Último registro: ' + formatDate(latest.timestamp);
 
-        content.innerHTML = renderCards(latest) + renderChart(data);
+        content.innerHTML = renderCards(latest) + renderCategoriesChartSection();
         bindLibraryModal();
+        loadMovieCategoriesChart();
       } catch (err) {
         if (err.name === 'AbortError') {
           content.innerHTML = '<div class="state error">Tiempo de espera agotado (15 s). Comprueba que la API /api/stats responda (p. ej. <a href="/api/ping" style="color: var(--accent);">/api/ping</a>) y que D1 esté accesible.</div>';
