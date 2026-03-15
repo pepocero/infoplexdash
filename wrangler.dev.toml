@@ -1,0 +1,17 @@
+# Config para desarrollo local en Windows (evita ERR_CONNECTION_RESET de pages dev).
+# Uso: npx wrangler dev --config wrangler.dev.toml
+# Abre: http://127.0.0.1:8787
+
+name = "infoplexdash"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "plex-stats"
+database_id = "708f6488-a142-4380-9136-f609a99468d9"

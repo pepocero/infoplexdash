@@ -1,0 +1,15 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno locales (contienen secretos)
+.dev.vars
+
+# Wrangler
+.wrangler/
+
+# Sistema
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local

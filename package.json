@@ -1,0 +1,13 @@
+{
+  "name": "infoplexdash",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.dev.toml --ip 127.0.0.1 --remote",
+    "dev:pages": "wrangler pages dev public --ip 127.0.0.1 --d1 DB=708f6488-a142-4380-9136-f609a99468d9",
+    "db:init": "wrangler d1 execute plex-stats --remote --file=./schema.sql --config wrangler.dev.toml",
+    "deploy": "wrangler deploy --config wrangler.dev.toml"
+  },
+  "devDependencies": {
+    "wrangler": "^3.91.0"
+  }
+}

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InfoPlex — Estadísticas Plex</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --surface-hover: #1c1c21;
+      --border: #2a2a30;
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #e5a00d;
+      --accent-dim: #b8860b;
+      --movies: #a78bfa;
+      --shows: #34d399;
+      --episodes: #f472b6;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(229, 160, 13, 0.08), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(167, 139, 250, 0.06), transparent);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .last-update {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .card:hover {
+      border-color: var(--accent-dim);
+      transform: translateY(-2px);
+    }
+
+    .card-label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2rem;
+      font-weight: 600;
+    }
+
+    .card.movies .card-value { color: var(--movies); }
+    .card.shows .card-value { color: var(--shows); }
+    .card.episodes .card-value { color: var(--episodes); }
+
+    .card.clickable {
+      cursor: pointer;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-width: 720px;
+      width: 100%;
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: var(--movies);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.25rem;
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 1.25rem;
+      overflow: auto;
+    }
+
+    .library-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+
+    .library-card {
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      border: none;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .library-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .library-card-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+      min-height: 2.2em;
+    }
+
+    .library-card-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .library-card-date {
+      font-size: 0.7rem;
+      opacity: 0.85;
+    }
+
+    .library-card.lib-violet { background: linear-gradient(145deg, #6d28d9 0%, #7c3aed 100%); color: #fff; }
+    .library-card.lib-emerald { background: linear-gradient(145deg, #059669 0%, #10b981 100%); color: #fff; }
+    .library-card.lib-rose { background: linear-gradient(145deg, #be185d 0%, #ec4899 100%); color: #fff; }
+    .library-card.lib-amber { background: linear-gradient(145deg, #b45309 0%, #f59e0b 100%); color: #fff; }
+    .library-card.lib-sky { background: linear-gradient(145deg, #0369a1 0%, #0ea5e9 100%); color: #fff; }
+    .library-card.lib-fuchsia { background: linear-gradient(145deg, #a21caf 0%, #d946ef 100%); color: #fff; }
+
+    .modal-state {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+
+    .modal-state.error {
+      color: #f87171;
+    }
+
+    .chart-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 2rem;
+    }
+
+    .chart-wrap h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 1.25rem 0;
+      color: var(--text-muted);
+    }
+
+    .chart-container {
+      position: relative;
+      height: 320px;
+    }
+
+    .state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+    }
+
+    .state.error {
+      color: #f87171;
+    }
+
+    .state.spinner::after {
+      content: '';
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      margin-top: 1rem;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Info<span>Plex</span> — Estadísticas</h1>
+      <div class="last-update" id="lastUpdate" aria-live="polite"></div>
+    </header>
+
+    <div id="content">
+      <div class="state spinner" id="state">Cargando datos de D1…</div>
+    </div>
+
+    <footer>
+      Datos desde Cloudflare D1 · plex_stats
+    </footer>
+  </div>
+
+  <div class="modal-overlay hidden" id="libraryModal" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Estadísticas por biblioteca (plex_library_stats)</h3>
+        <button type="button" class="modal-close" id="modalClose" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-body" id="libraryModalBody">
+        <div class="modal-state">Cargando…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api/stats';
+    const FETCH_TIMEOUT_MS = 15000;
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleString('es-ES', {
+        dateStyle: 'short',
+        timeStyle: 'short'
+      });
+    }
+
+    function fetchWithTimeout(url, options = {}, timeout = FETCH_TIMEOUT_MS) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
+    }
+
+    function renderCards(latest) {
+      if (!latest) return '';
+      return `
+        <div class="cards">
+          <div class="card movies clickable" id="card-movies" role="button" tabindex="0" aria-label="Ver estadísticas por biblioteca">
+            <div class="card-label">Películas</div>
+            <div class="card-value">${Number(latest.movies).toLocaleString('es')}</div>
+          </div>
+          <div class="card shows">
+            <div class="card-label">Series</div>
+            <div class="card-value">${Number(latest.shows).toLocaleString('es')}</div>
+          </div>
+          <div class="card episodes">
+            <div class="card-label">Episodios</div>
+            <div class="card-value">${Number(latest.episodes).toLocaleString('es')}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderChart(data) {
+      if (!data || data.length === 0) return '';
+
+      const labels = data.map(r => formatDate(r.timestamp)).reverse();
+      const moviesData = data.map(r => r.movies).reverse();
+      const showsData = data.map(r => r.shows).reverse();
+      const episodesData = data.map(r => r.episodes).reverse();
+
+      const html = `
+        <div class="chart-wrap">
+          <h2>Evolución en el tiempo</h2>
+          <div class="chart-container">
+            <canvas id="evolutionChart" aria-label="Gráfica de evolución de películas, series y episodios"></canvas>
+          </div>
+        </div>
+      `;
+
+      setTimeout(() => {
+        const ctx = document.getElementById('evolutionChart');
+        if (!ctx) return;
+        new Chart(ctx.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Películas',
+                data: moviesData,
+                borderColor: '#a78bfa',
+                backgroundColor: 'rgba(167, 139, 250, 0.1)',
+                fill: true,
+                tension: 0.3
+              },
+              {
+                label: 'Series',
+                data: showsData,
+                borderColor: '#34d399',
+                backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                fill: true,
+                tension: 0.3
+              },
+              {
+                label: 'Episodios',
+                data: episodesData,
+                borderColor: '#f472b6',
+                backgroundColor: 'rgba(244, 114, 182, 0.1)',
+                fill: true,
+                tension: 0.3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: {
+                  color: '#e4e4e7',
+                  font: { family: 'Outfit', size: 12 }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: 'rgba(42, 42, 48, 0.6)' },
+                ticks: { color: '#71717a', maxTicksLimit: 10 }
+              },
+              y: {
+                grid: { color: 'rgba(42, 42, 48, 0.6)' },
+                ticks: { color: '#71717a' }
+              }
+            }
+          }
+        });
+      }, 50);
+
+      return html;
+    }
+
+    async function load() {
+      const content = document.getElementById('content');
+      const lastUpdate = document.getElementById('lastUpdate');
+
+      try {
+        const res = await fetchWithTimeout(API);
+        const json = await res.json();
+
+        if (!res.ok) {
+          content.innerHTML = `<div class="state error">Error: ${json.error || res.status}${json.detail ? ' — ' + json.detail : ''}</div>`;
+          return;
+        }
+
+        const data = json.data || [];
+        if (data.length === 0) {
+          content.innerHTML = '<div class="state">No hay registros en plex_stats. Añade datos a D1 para ver el dashboard.</div>';
+          lastUpdate.textContent = '';
+          return;
+        }
+
+        const latest = data[0];
+        lastUpdate.textContent = 'Último registro: ' + formatDate(latest.timestamp);
+
+        content.innerHTML = renderCards(latest) + renderChart(data);
+        bindLibraryModal();
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          content.innerHTML = '<div class="state error">Tiempo de espera agotado (15 s). Comprueba que la API /api/stats responda (p. ej. <a href="/api/ping" style="color: var(--accent);">/api/ping</a>) y que D1 esté accesible.</div>';
+        } else {
+          content.innerHTML = `<div class="state error">No se pudieron cargar los datos: ${err.message}</div>`;
+        }
+        lastUpdate.textContent = '';
+      }
+    }
+
+    function bindLibraryModal() {
+      const card = document.getElementById('card-movies');
+      const overlay = document.getElementById('libraryModal');
+      const body = document.getElementById('libraryModalBody');
+      const closeBtn = document.getElementById('modalClose');
+
+      function openModal() {
+        overlay.classList.remove('hidden');
+        overlay.setAttribute('aria-hidden', 'false');
+        body.innerHTML = '<div class="modal-state">Cargando…</div>';
+        fetchLibraryStats();
+      }
+
+      function closeModal() {
+        overlay.classList.add('hidden');
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+
+      async function fetchLibraryStats() {
+        try {
+          const res = await fetchWithTimeout('/api/library-stats?limit=100');
+          const json = await res.json();
+          if (!res.ok) {
+            body.innerHTML = '<div class="modal-state error">' + (json.error || res.status) + (json.detail ? ' — ' + json.detail : '') + '</div>';
+            return;
+          }
+          const data = json.data || [];
+          if (data.length === 0) {
+            body.innerHTML = '<div class="modal-state">No hay registros en plex_library_stats.</div>';
+            return;
+          }
+          const colors = ['lib-violet', 'lib-emerald', 'lib-rose', 'lib-amber', 'lib-sky', 'lib-fuchsia'];
+          const cards = data.map(function (r, i) {
+            var cls = colors[i % colors.length];
+            var name = escapeHtml(r.library_name || '—');
+            var count = Number(r.count).toLocaleString('es');
+            var date = formatDate(r.timestamp);
+            return '<div class="library-card ' + cls + '"><div class="library-card-name">' + name + '</div><div class="library-card-count">' + count + '</div><div class="library-card-date">' + date + '</div></div>';
+          }).join('');
+          body.innerHTML = '<div class="library-cards">' + cards + '</div>';
+        } catch (err) {
+          body.innerHTML = '<div class="modal-state error">' + escapeHtml(err.message) + '</div>';
+        }
+      }
+
+      function escapeHtml(s) {
+        if (s == null) return '—';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+
+      if (card) {
+        card.addEventListener('click', openModal);
+        card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(); } });
+      }
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+    }
+
+    load();
+  </script>
+</body>
+</html>
