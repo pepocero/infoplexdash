@@ -406,6 +406,16 @@
             if (emptyEl) { emptyEl.classList.remove('hidden'); }
             return;
           }
+          // Deduplica categorías por nombre tomando el registro más reciente.
+          // /api/library-stats viene ordenado por timestamp DESC.
+          var dedupMap = {};
+          data.forEach(function (r) {
+            var key = String((r.library_name || '—')).trim().toLowerCase();
+            if (!dedupMap[key]) {
+              dedupMap[key] = r;
+            }
+          });
+          data = Object.keys(dedupMap).map(function (k) { return dedupMap[k]; });
           data.sort(function (a, b) { return (Number(b.count) || 0) - (Number(a.count) || 0); });
           if (emptyEl) { emptyEl.classList.add('hidden'); }
           var labels = data.map(function (r) { return r.library_name || '—'; });
