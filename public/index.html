@@ -529,11 +529,20 @@
             body.innerHTML = '<div class="modal-state error">' + (json.error || res.status) + (json.detail ? ' — ' + json.detail : '') + '</div>';
             return;
           }
-          const data = json.data || [];
+          let data = json.data || [];
           if (data.length === 0) {
             body.innerHTML = '<div class="modal-state">No hay registros en plex_library_stats.</div>';
             return;
           }
+          // Deduplica por nombre usando el primer registro (más reciente) de cada categoría/biblioteca.
+          const dedupMap = {};
+          data.forEach(function (r) {
+            const key = String((r.library_name || '—')).trim().toLowerCase();
+            if (!dedupMap[key]) {
+              dedupMap[key] = r;
+            }
+          });
+          data = Object.keys(dedupMap).map(function (k) { return dedupMap[k]; });
           const colors = ['lib-violet', 'lib-emerald', 'lib-rose', 'lib-amber', 'lib-sky', 'lib-fuchsia'];
           const cards = data.map(function (r, i) {
             var cls = colors[i % colors.length];
